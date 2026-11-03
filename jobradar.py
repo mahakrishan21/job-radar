@@ -9,7 +9,7 @@ Run:  python3 jobradar.py
 Out:  data/runs/YYYY-MM-DD_HHMMSS/ (report.html, digest.md, jobs.csv, rejected.csv, raw.json, summary.json)
       data/seen.json (remembers what you've seen across runs)
 """
-import csv, datetime, email.utils, html, json, pathlib, re, sys, time, urllib.parse, urllib.request
+import csv, datetime, email.utils, html, json, os, pathlib, re, sys, time, urllib.parse, urllib.request, uuid
 import xml.etree.ElementTree as ET
 from concurrent.futures import ThreadPoolExecutor
 
@@ -646,6 +646,56 @@ def write_html(path, results, dropped, summary):
     path.write_text(page, encoding="utf-8")
 
 
+# ---------- telegram ----------
+def tg(method, fields, files=None):
+    url = f"https://api.telegram.org/bot{os.environ['TELEGRAM_BOT_TOKEN']}/{method}"
+    if files:  # multipart upload, standard library only
+        b = uuid.uuid4().hex
+        body = b"".join(f'--{b}\r\nContent-Disposition: form-data; name="{k}"\r\n\r\n{v}\r\n'.encode()
+                        for k, v in fields.items())
+        for k, (name, data) in files.items():
+            body += (f'--{b}\r\nContent-Disposition: form-data; name="{k}"; filename="{name}"\r\n'
+                     f"Content-Type: text/html\r\n\r\n").encode() + data + b"\r\n"
+        body += f"--{b}--\r\n".encode()
+        req = urllib.request.Request(url, body, {"Content-Type": f"multipart/form-data; boundary={b}"})
+    else:
+        req = urllib.request.Request(url, json.dumps(fields).encode(), {"Content-Type": "application/json"})
+    with urllib.request.urlopen(req, timeout=60) as r:
+        return json.loads(r.read())
+
+
+def telegram_messages(results, summary):
+    # the shortlist as phone-sized messages (Telegram caps a message at 4096 characters)
+    e = lambda s: html.escape(str(s), quote=False)
+    d = datetime.date.fromisoformat(summary["started"][:10])
+    blocks = [f"<b>🎯 Job Radar · {d.day} {d:%b}</b>\n{summary['matches']} matches · {summary['new']} new · "
+              f"{sum(r['risk'] == 'Low' for r in results)} low rejection risk"]
+    for tier, icon in (("Apply first", "✅"), ("Apply next", "🟡"), ("Stretch", "🔸")):
+        rs = [r for r in results if r["shortlist"] == tier]
+        if rs:
+            blocks.append(f"\n<b>{icon} {tier.upper()}</b>")
+        for r in rs:
+            why = r["pros"] if tier == "Apply first" else (r["cons"] or r["pros"])
+            meta = " · ".join(x for x in (str(r["score"]), f"{r['risk']} risk", r["type"], r["salary"]) if x)
+            blocks.append(f'{"🆕 " if r["new"] else ""}<a href="{html.escape(r["url"])}">{e(r["title"])}</a> — '
+                          f'{e(r["company"])}\n   {e(meta)}' + (f"\n   {e(why.replace('; ', ' · '))}" if why else ""))
+    messages, cur = [], ""
+    for blk in blocks:
+        if len(cur) + len(blk) > 3900:
+            messages.append(cur)
+            cur = ""
+        cur += blk + "\n"
+    return messages + [cur]
+
+
+def send_telegram(results, summary, report):
+    chat = os.environ["TELEGRAM_CHAT_ID"]
+    for text in telegram_messages(results, summary):
+        tg("sendMessage", {"chat_id": chat, "text": text, "parse_mode": "HTML", "disable_web_page_preview": True})
+    tg("sendDocument", {"chat_id": chat, "caption": "Full report: every match, sortable. Open it in your browser."},
+       {"document": (f"job-radar-{summary['started'][:10]}.html", report.read_bytes())})
+
+
 # ---------- run ----------
 def write_csv(path, rows, cols):
     with open(path, "w", newline="", encoding="utf-8") as f:
@@ -733,6 +783,13 @@ def main():
     SEEN_FILE.write_text(json.dumps(sorted(seen | {r["url"] for r in results})))
     print(f"\n{len(results)} matches ({len(all_new)} new), {rejected} dropped (region-only or wrong job type).")
     print(f"Saved to {run_dir.relative_to(ROOT)}/")
+
+    if os.environ.get("TELEGRAM_BOT_TOKEN") and os.environ.get("TELEGRAM_CHAT_ID"):
+        try:
+            send_telegram(results, summary, run_dir / "report.html")
+            print("Sent to Telegram")
+        except Exception as e:  # a failed message shouldn't lose the run
+            print(f"Telegram: failed ({e})", file=sys.stderr)
 
 
 if __name__ == "__main__":

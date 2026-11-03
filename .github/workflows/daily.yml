@@ -29,6 +29,9 @@ jobs:
 
       - name: Search jobs
         run: python jobradar.py
+        env:  # optional: set these repo secrets to get the shortlist on Telegram
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
 
       - name: Save seen jobs
         uses: actions/cache/save@v4

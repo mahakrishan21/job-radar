@@ -98,6 +98,21 @@ The India filter lives in `jobradar.py` (`LOC_INDIA`, `LOC_BLOCK`, `TEXT_BLOCK`)
 - **Tracking new jobs:** "NEW" carries over between runs via GitHub's cache.
 - **Cost and limits:** scheduled runs are free on public repos and fit well inside the free minutes on private ones. GitHub pauses scheduled workflows after 60 days with no repo activity, and re-enabling them takes one click.
 
+### Get the shortlist on Telegram
+
+After each run, a Telegram bot can message you the shortlist, with every job as a tappable link, and attach `report.html` for the full table.
+
+1. **Create the bot.** In Telegram, open **@BotFather**, send `/newbot`, and pick a name. Copy the **token** it replies with.
+2. **Start a chat with it.** Open your new bot and send it any message, e.g. `hi`.
+3. **Find your chat ID.** Open `https://api.telegram.org/bot<TOKEN>/getUpdates` in a browser, with your token in place of `<TOKEN>`. Copy the number after `"chat":{"id":`.
+4. **Save both as repo secrets.** Go to the repo's **Settings → Secrets and variables → Actions → New repository secret** and add `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID`. Or, in a terminal in this folder:
+   ```bash
+   gh secret set TELEGRAM_BOT_TOKEN    # paste the token when asked
+   gh secret set TELEGRAM_CHAT_ID      # paste the chat ID when asked
+   ```
+
+The next run sends the messages. For local runs, set the same two environment variables before running `jobradar.py`.
+
 ### On your own machine
 - **Mac/Linux:** run `crontab -e` and add:
   `0 9 * * * cd /path/to/job-radar && python3 jobradar.py`
