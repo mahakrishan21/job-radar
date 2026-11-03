@@ -1,0 +1,44 @@
+name: Daily job search
+
+on:
+  schedule:
+    - cron: "30 3 * * *"   # 03:30 UTC = 09:00 IST, every day
+  workflow_dispatch:         # adds a "Run workflow" button on the Actions tab
+
+permissions:
+  contents: read
+
+jobs:
+  search:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      # seen.json is what makes "NEW" work; carry it from one run to the next
+      - name: Restore seen jobs
+        uses: actions/cache/restore@v4
+        with:
+          path: data/seen.json
+          key: seen-${{ github.run_id }}
+          restore-keys: seen-
+
+      - name: Search jobs
+        run: python jobradar.py
+
+      - name: Save seen jobs
+        uses: actions/cache/save@v4
+        with:
+          path: data/seen.json
+          key: seen-${{ github.run_id }}
+
+      - name: Upload report
+        uses: actions/upload-artifact@v4
+        with:
+          name: job-radar-${{ github.run_number }}
+          path: data/runs/
+          retention-days: 30
