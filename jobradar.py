@@ -647,8 +647,17 @@ def write_html(path, results, dropped, summary):
 
 
 # ---------- telegram ----------
+def tg_setting(name, pattern):
+    # tolerate stray spaces or surrounding text pasted into the secret along with the value
+    m = re.search(pattern, os.environ.get(name, ""))
+    if not m:
+        raise ValueError(f"{name} doesn't look right; check the secret")
+    return m.group(0)
+
+
 def tg(method, fields, files=None):
-    url = f"https://api.telegram.org/bot{os.environ['TELEGRAM_BOT_TOKEN']}/{method}"
+    token = tg_setting("TELEGRAM_BOT_TOKEN", r"\d+:[A-Za-z0-9_-]{30,}")
+    url = f"https://api.telegram.org/bot{token}/{method}"
     if files:  # multipart upload, standard library only
         b = uuid.uuid4().hex
         body = b"".join(f'--{b}\r\nContent-Disposition: form-data; name="{k}"\r\n\r\n{v}\r\n'.encode()
@@ -689,7 +698,7 @@ def telegram_messages(results, summary):
 
 
 def send_telegram(results, summary, report):
-    chat = os.environ["TELEGRAM_CHAT_ID"]
+    chat = tg_setting("TELEGRAM_CHAT_ID", r"-?\d+")
     for text in telegram_messages(results, summary):
         tg("sendMessage", {"chat_id": chat, "text": text, "parse_mode": "HTML", "disable_web_page_preview": True})
     tg("sendDocument", {"chat_id": chat, "caption": "Full report: every match, sortable. Open it in your browser."},
