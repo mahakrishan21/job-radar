@@ -649,9 +649,11 @@ def write_html(path, results, dropped, summary):
 # ---------- telegram ----------
 def tg_setting(name, pattern):
     # tolerate stray spaces or surrounding text pasted into the secret along with the value
-    m = re.search(pattern, os.environ.get(name, ""))
-    if not m:
-        raise ValueError(f"{name} doesn't look right; check the secret")
+    v = re.sub(r"\s+", "", os.environ.get(name, ""))
+    m = re.search(pattern, v)
+    if not m:  # describe the shape only, never the value
+        raise ValueError(f"{name} doesn't look right ({len(v)} characters without spaces, "
+                         f"{'has' if ':' in v else 'no'} colon); check the secret")
     return m.group(0)
 
 
