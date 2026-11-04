@@ -671,8 +671,11 @@ def tg(method, fields, files=None):
         req = urllib.request.Request(url, body, {"Content-Type": f"multipart/form-data; boundary={b}"})
     else:
         req = urllib.request.Request(url, json.dumps(fields).encode(), {"Content-Type": "application/json"})
-    with urllib.request.urlopen(req, timeout=60) as r:
-        return json.loads(r.read())
+    try:
+        with urllib.request.urlopen(req, timeout=60) as r:
+            return json.loads(r.read())
+    except urllib.error.HTTPError as e:  # Telegram explains the error in the body, e.g. "chat not found"
+        raise RuntimeError(f"{method}: {e.code} {json.loads(e.read() or b'{}').get('description', '')}") from None
 
 
 def telegram_messages(results, summary):
