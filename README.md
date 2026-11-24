@@ -113,6 +113,22 @@ After each run, a Telegram bot can message you the shortlist, with every job as 
 
 The next run sends the messages. For local runs, set the same two environment variables before running `jobradar.py`.
 
+### Track jobs in a Google Sheet
+
+Every run can update a Google Sheet. New jobs appear at the top with a **Status** dropdown (New, To apply, Applied, Interview, Offer, Rejected, Skip). Each later run refreshes the scores and the **Last seen** date. Status, Notes and any columns you add are never overwritten.
+
+1. **Create the sheet.** Open [sheets.new](https://sheets.new) and name it Job Radar.
+2. **Add the script.** Open **Extensions → Apps Script**, replace what's there with `google-sheet/Code.gs`, and save.
+3. **Run `setup`.** Pick `setup` in the toolbar, click **Run**, and allow access. Google warns that the app isn't verified, because it's your own script: choose **Advanced → Go to project**. Copy the `GOOGLE_SHEET_TOKEN` from the execution log (it's also under **Project Settings → Script Properties**).
+4. **Deploy it.** **Deploy → New deployment → Web app**. Set **Execute as** to *Me* and **Who has access** to *Anyone*, then copy the URL ending in `/exec`. If you change the script later, use **Manage deployments → pencil → New version** so the URL stays the same. Requests without the token are refused.
+5. **Save both as repo secrets**, in a terminal in this folder. Paste each value when asked:
+   ```bash
+   gh secret set GOOGLE_SHEET_URL
+   gh secret set GOOGLE_SHEET_TOKEN
+   ```
+
+The next run fills the sheet. For a local run, set the same two environment variables and run `python3 sheets.py` after `jobradar.py`. Keep the hidden **Key** column: it matches each job to its row.
+
 ### On your own machine
 - **Mac/Linux:** run `crontab -e` and add:
   `0 9 * * * cd /path/to/job-radar && python3 jobradar.py`
@@ -126,5 +142,4 @@ The next run sends the messages. For local runs, set the same two environment va
 ## Roadmap
 
 - **A Claude API pass:** reads unclear listings and writes a short note on why each one fits.
-- **Tracking:** Google Sheet sync for applications.
 - **Applications:** tailored cover notes for shortlisted roles.

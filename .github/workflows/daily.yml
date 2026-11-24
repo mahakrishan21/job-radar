@@ -45,3 +45,10 @@ jobs:
           name: job-radar-${{ github.run_number }}
           path: data/runs/
           retention-days: 30
+
+      # last, so a Google error shows as a failed run without losing the report or the seen list
+      - name: Update Google Sheet
+        run: python sheets.py
+        env:  # optional: set these repo secrets to track jobs in a Google Sheet
+          GOOGLE_SHEET_URL: ${{ secrets.GOOGLE_SHEET_URL }}
+          GOOGLE_SHEET_TOKEN: ${{ secrets.GOOGLE_SHEET_TOKEN }}
